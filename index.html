@@ -9,6 +9,7 @@
   <title>日報アプリ</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-192.png">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -231,6 +232,7 @@ const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 
 // ============ 状態管理 ============
 let accessToken = null;
+let tokenClient = null;
 let recognition = null;
 let isRecording = false;
 let summaryResult = '';
@@ -239,10 +241,15 @@ let summaryResult = '';
 document.addEventListener('DOMContentLoaded', () => {
   updateDateDisplay();
   loadApiKey();
-  checkTokenFromUrl();
-  if (localStorage.getItem('gAccessToken')) {
-    accessToken = localStorage.getItem('gAccessToken');
+  // 保存済みトークンを復元
+  const saved = localStorage.getItem('gAccessToken');
+  const expiry = localStorage.getItem('gTokenExpiry');
+  if (saved && expiry && Date.now() < parseInt(expiry)) {
+    accessToken = saved;
     updateAuthUI(true);
+  } else {
+    localStorage.removeItem('gAccessToken');
+    localStorage.removeItem('gTokenExpiry');
   }
 });
 
@@ -252,37 +259,34 @@ function updateDateDisplay() {
   document.getElementById('dateDisplay').textContent = now.toLocaleDateString('ja-JP', options);
 }
 
-// ============ Google OAuth ============
+// ============ Google OAuth (GIS) ============
 function handleAuth() {
   if (accessToken) {
-    // ログアウト
     accessToken = null;
     localStorage.removeItem('gAccessToken');
+    localStorage.removeItem('gTokenExpiry');
     updateAuthUI(false);
     return;
   }
-  const redirectUri = window.location.origin + window.location.pathname;
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-    `client_id=${CLIENT_ID}` +
-    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-    `&response_type=token` +
-    `&scope=${encodeURIComponent(SCOPES)}` +
-    `&prompt=consent`;
-  window.location.href = authUrl;
-}
-
-function checkTokenFromUrl() {
-  const hash = window.location.hash;
-  if (hash.includes('access_token')) {
-    const params = new URLSearchParams(hash.substring(1));
-    const token = params.get('access_token');
-    if (token) {
-      accessToken = token;
-      localStorage.setItem('gAccessToken', token);
-      updateAuthUI(true);
-      history.replaceState(null, '', window.location.pathname);
-    }
+  // Google Identity Services でトークン取得
+  if (!tokenClient) {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: (resp) => {
+        if (resp.error) {
+          showStatus('saveStatus', '認証エラー: ' + resp.error, 'error');
+          return;
+        }
+        accessToken = resp.access_token;
+        const expiry = Date.now() + (resp.expires_in || 3600) * 1000;
+        localStorage.setItem('gAccessToken', accessToken);
+        localStorage.setItem('gTokenExpiry', expiry.toString());
+        updateAuthUI(true);
+      }
+    });
   }
+  tokenClient.requestAccessToken({ prompt: 'consent' });
 }
 
 function updateAuthUI(loggedIn) {
