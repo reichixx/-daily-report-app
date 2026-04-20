@@ -345,8 +345,7 @@ async function summarizeReport() {
 }
 
 function simpleExtract(text) {
-  const s = text.split(/[。！？\n]/).filter(s => s.trim().length > 5);
-  return `【本日の日報要約】\n${s.slice(0,3).join('。')}。\n\n文字数: ${text.length}文字`;
+  return text.trim();
 }
 
 // ============ Google Sheets保存（Apps Script経由） ============
