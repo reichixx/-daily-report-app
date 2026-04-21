@@ -377,7 +377,7 @@ async function saveToSheets() {
   const now = new Date();
   const dateStr = now.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
   const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-  const report = summaryResult || text.substring(0, 300);
+  const report = summaryResult || text.substring(0, 600);
   const issues = text.split(/[。\n]/).filter(s =>
     s.includes('課題') || s.includes('問題') || s.includes('懸念') || s.includes('困っ')
   ).join('、') || 'なし';
