@@ -243,15 +243,36 @@ function loadApiKey() {
 }
 
 // ============ 音声認識 ============
+const SILENCE_TIMEOUT = 30000; // 無音30秒で自動停止
+let silenceTimer = null;
+
+function stopVoice() {
+  isRecording = false;
+  clearTimeout(silenceTimer);
+  recognition && recognition.stop();
+  document.getElementById('voiceBtn').textContent = '🎤 音声入力開始';
+  document.getElementById('voiceBtn').classList.remove('recording');
+}
+
+function resetSilenceTimer() {
+  clearTimeout(silenceTimer);
+  silenceTimer = setTimeout(() => {
+    showStatus('voiceStatus', '✅ 無音30秒のため自動停止しました', 'success');
+    stopVoice();
+  }, SILENCE_TIMEOUT);
+}
+
 function toggleVoice() {
   if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
     showStatus('voiceStatus', 'iPhoneのSafariで開いてください', 'error');
     return;
   }
   if (isRecording) {
-    recognition.stop();
+    showStatus('voiceStatus', '✅ 音声入力を停止しました', 'success');
+    stopVoice();
     return;
   }
+
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   recognition = new SR();
   recognition.lang = 'ja-JP';
@@ -262,10 +283,10 @@ function toggleVoice() {
 
   recognition.onstart = () => {
     isRecording = true;
-    const btn = document.getElementById('voiceBtn');
-    btn.textContent = '⏹️ 録音停止';
-    btn.classList.add('recording');
-    showStatus('voiceStatus', '🎙️ 録音中... 話してください', 'info');
+    document.getElementById('voiceBtn').textContent = '⏹️ 録音停止';
+    document.getElementById('voiceBtn').classList.add('recording');
+    showStatus('voiceStatus', '🎙️ 録音中... （無音30秒で自動停止）', 'info');
+    resetSilenceTimer();
   };
 
   recognition.onresult = (event) => {
@@ -278,21 +299,21 @@ function toggleVoice() {
       }
     }
     document.getElementById('reportText').value = finalTranscript + interim;
+    resetSilenceTimer(); // 発話があるたびにタイマーリセット
   };
 
   recognition.onend = () => {
-    isRecording = false;
-    const btn = document.getElementById('voiceBtn');
-    btn.textContent = '🎤 音声入力開始';
-    btn.classList.remove('recording');
-    showStatus('voiceStatus', '✅ 音声入力完了', 'success');
+    if (isRecording) {
+      // 意図せず切れた場合は自動再起動
+      try { recognition.start(); } catch(e) { stopVoice(); }
+      return;
+    }
   };
 
   recognition.onerror = (e) => {
+    if (e.error === 'no-speech' && isRecording) return; // 無音エラーは無視して継続
     showStatus('voiceStatus', `エラー: ${e.error}`, 'error');
-    isRecording = false;
-    document.getElementById('voiceBtn').textContent = '🎤 音声入力開始';
-    document.getElementById('voiceBtn').classList.remove('recording');
+    stopVoice();
   };
 
   recognition.start();
