@@ -262,7 +262,7 @@ function resetSilenceTimer() {
   }, SILENCE_TIMEOUT);
 }
 
-function toggleVoice() {
+async function toggleVoice() {
   if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
     showStatus('voiceStatus', 'iPhoneのSafariで開いてください', 'error');
     return;
@@ -273,6 +273,23 @@ function toggleVoice() {
     return;
   }
 
+  // マイク権限を事前に確認・取得
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop()); // 権限確認後すぐ解放
+    } catch (err) {
+      showStatus('voiceStatus',
+        'マイクへのアクセスが拒否されています。iPhoneの「設定」→「Safari」→「マイク」を許可してください',
+        'error');
+      return;
+    }
+  }
+
+  startRecognition();
+}
+
+function startRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   recognition = new SR();
   recognition.lang = 'ja-JP';
@@ -299,19 +316,32 @@ function toggleVoice() {
       }
     }
     document.getElementById('reportText').value = finalTranscript + interim;
-    resetSilenceTimer(); // 発話があるたびにタイマーリセット
+    resetSilenceTimer();
   };
 
   recognition.onend = () => {
     if (isRecording) {
-      // 意図せず切れた場合は自動再起動
       try { recognition.start(); } catch(e) { stopVoice(); }
       return;
     }
   };
 
   recognition.onerror = (e) => {
-    if (e.error === 'no-speech' && isRecording) return; // 無音エラーは無視して継続
+    if (e.error === 'no-speech' && isRecording) return;
+    if (e.error === 'audio-capture') {
+      showStatus('voiceStatus',
+        'マイクにアクセスできません。iPhoneの「設定」→「Safari」→「マイク」を「許可」にしてください',
+        'error');
+      stopVoice();
+      return;
+    }
+    if (e.error === 'not-allowed') {
+      showStatus('voiceStatus',
+        'マイクの使用が拒否されています。iPhoneの「設定」→「Safari」→「マイク」を「許可」にしてください',
+        'error');
+      stopVoice();
+      return;
+    }
     showStatus('voiceStatus', `エラー: ${e.error}`, 'error');
     stopVoice();
   };
