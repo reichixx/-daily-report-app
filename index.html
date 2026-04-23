@@ -327,7 +327,7 @@ function startRecognition() {
   };
 
   recognition.onerror = (e) => {
-    if (e.error === 'no-speech' && isRecording) return;
+    if ((e.error === 'no-speech' || e.error === 'aborted') && isRecording) return;
     if (e.error === 'audio-capture') {
       showStatus('voiceStatus',
         'マイクにアクセスできません。iPhoneの「設定」→「Safari」→「マイク」を「許可」にしてください',
