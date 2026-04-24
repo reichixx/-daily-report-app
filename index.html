@@ -321,7 +321,10 @@ function startRecognition() {
 
   recognition.onend = () => {
     if (isRecording) {
-      try { recognition.start(); } catch(e) { stopVoice(); }
+      // 同じインスタンスの再起動はiOSで失敗しやすいため、新しいインスタンスで再起動
+      setTimeout(() => {
+        if (isRecording) startRecognition();
+      }, 300);
       return;
     }
   };
