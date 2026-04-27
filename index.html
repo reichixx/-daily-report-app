@@ -144,6 +144,15 @@
 </head>
 <body>
 
+<!-- ホーム画面起動時の警告バナー -->
+<div id="standaloneWarning" style="display:none; background:#fff3cd; color:#856404; padding:14px 16px; text-align:center; font-size:14px; line-height:1.6;">
+  ⚠️ ホーム画面から起動すると音声入力が使えません。<br>
+  <a href="https://reichixx.github.io/-daily-report-app/" target="_blank"
+     style="color:#667eea; font-weight:700; text-decoration:underline;">
+    ここをタップしてSafariで開く →
+  </a>
+</div>
+
 <header>
   <h1>📋 日報アプリ</h1>
   <p>音声入力 → AI要約 → Google Sheets自動保存</p>
@@ -221,6 +230,10 @@ let summaryResult = '';
 document.addEventListener('DOMContentLoaded', () => {
   updateDateDisplay();
   loadApiKey();
+  // ホーム画面から起動された場合は警告バナーを表示
+  if (window.navigator.standalone === true) {
+    document.getElementById('standaloneWarning').style.display = 'block';
+  }
 });
 
 function updateDateDisplay() {
