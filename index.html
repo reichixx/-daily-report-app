@@ -144,13 +144,11 @@
 </head>
 <body>
 
-<!-- ホーム画面起動時の警告バナー -->
-<div id="standaloneWarning" style="display:none; background:#fff3cd; color:#856404; padding:14px 16px; text-align:center; font-size:14px; line-height:1.6;">
-  ⚠️ ホーム画面から起動すると音声入力が使えません。<br>
-  <a href="https://reichixx.github.io/-daily-report-app/" target="_blank"
-     style="color:#667eea; font-weight:700; text-decoration:underline;">
-    ここをタップしてSafariで開く →
-  </a>
+<!-- ホーム画面起動時の通知バナー -->
+<div id="standaloneWarning" style="display:none; background:#e8f4fd; color:#2980b9; padding:14px 16px; text-align:center; font-size:14px; line-height:1.6;">
+  📱 ホーム画面から起動中です。<br>
+  <strong>音声入力はSafariで直接開いた時のみ使えます。</strong><br>
+  このままキーボードで入力できます ⌨️
 </div>
 
 <header>
@@ -230,9 +228,16 @@ let summaryResult = '';
 document.addEventListener('DOMContentLoaded', () => {
   updateDateDisplay();
   loadApiKey();
-  // ホーム画面から起動された場合は警告バナーを表示
+  // ホーム画面から起動された場合はキーボードモードに切り替え
   if (window.navigator.standalone === true) {
     document.getElementById('standaloneWarning').style.display = 'block';
+    // 音声ボタンを無効化してキーボード入力を促す
+    const voiceBtn = document.getElementById('voiceBtn');
+    voiceBtn.disabled = true;
+    voiceBtn.style.opacity = '0.4';
+    voiceBtn.textContent = '🎤 音声入力（Safariで開いた時のみ使用可）';
+    // テキストエリアにフォーカス
+    setTimeout(() => document.getElementById('reportText').focus(), 500);
   }
 });
 
