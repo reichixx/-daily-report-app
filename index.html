@@ -160,6 +160,9 @@
     <button class="btn btn-voice" id="voiceBtn" onclick="toggleVoice()">
       🎤 音声入力開始
     </button>
+    <button class="btn btn-secondary" onclick="switchToKeyboard()" style="margin-top:8px;">
+      ⌨️ キーボードで入力する
+    </button>
     <div id="voiceStatus" class="status"></div>
     <textarea id="reportText" placeholder="ここに日報を入力&#10;（音声ボタンを押して話すか、直接入力してください）&#10;&#10;例：今日は〇〇の作業を完了しました。課題として△△があります。"></textarea>
   </div>
@@ -345,6 +348,13 @@ function startRecognition() {
       stopVoice();
       return;
     }
+    if (e.error === 'service-not-allowed') {
+      showStatus('voiceStatus',
+        '⚠️ 音声認識が使えません。「設定」→「Siriと検索」でSiriをオンにするか、⌨️キーボードで入力ボタンから直接入力してください',
+        'error');
+      stopVoice();
+      return;
+    }
     showStatus('voiceStatus', `エラー: ${e.error}`, 'error');
     stopVoice();
   };
@@ -400,6 +410,14 @@ async function summarizeReport() {
 
 function simpleExtract(text) {
   return text.trim();
+}
+
+// ============ キーボード入力モード ============
+function switchToKeyboard() {
+  stopVoice();
+  const textarea = document.getElementById('reportText');
+  textarea.focus();
+  showStatus('voiceStatus', '⌨️ キーボードで入力できます。入力後「AI要約」または「保存」を押してください', 'info');
 }
 
 // ============ Google Sheets保存（Apps Script経由） ============
