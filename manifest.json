@@ -3,7 +3,7 @@
   "short_name": "日報",
   "description": "音声入力・AI要約・Google Sheets連携の日報アプリ",
   "start_url": "/-daily-report-app/",
-  "display": "standalone",
+  "display": "browser",
   "background_color": "#f0f2f5",
   "theme_color": "#667eea",
   "orientation": "portrait",
