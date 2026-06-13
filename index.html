@@ -179,7 +179,7 @@
     <h2>✨ AI要約 <span class="badge">オプション</span></h2>
     <p style="font-size:13px;color:#888;margin-bottom:8px;">Claude APIキーを設定すると自動要約できます（なくても保存可能）</p>
     <div class="api-key-row">
-      <input type="password" id="claudeApiKey" placeholder="sk-ant-...">
+      <input type="password" id="claudeApiKey" placeholder="sk-ant-..." autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off">
       <button onclick="saveApiKey()">保存</button>
     </div>
     <div id="apiKeyStatus" class="status"></div>
@@ -263,12 +263,18 @@ function updateDateDisplay() {
 
 // ============ Claude API ============
 function saveApiKey() {
-  const key = document.getElementById('claudeApiKey').value.trim();
+  // 空白や改行を除去
+  let key = document.getElementById('claudeApiKey').value.replace(/\s/g, '');
+  // iPhoneの自動大文字化で先頭が大文字になった場合に備え、先頭の sk-ant- 部分を小文字に補正
+  if (key.toLowerCase().startsWith('sk-ant-')) {
+    key = 'sk-ant-' + key.slice(7);
+  }
   if (!key.startsWith('sk-ant-')) {
-    showStatus('apiKeyStatus', 'APIキーの形式が正しくありません（sk-ant-で始まる必要があります）', 'error');
+    showStatus('apiKeyStatus', 'APIキーが正しくないようです。キーをコピーして貼り付けてください（手入力だと先頭が大文字になることがあります）', 'error');
     return;
   }
   localStorage.setItem('claudeApiKey', key);
+  document.getElementById('claudeApiKey').value = key;
   showStatus('apiKeyStatus', 'APIキーを保存しました ✅', 'success');
 }
 
