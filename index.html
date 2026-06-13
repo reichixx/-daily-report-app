@@ -317,11 +317,12 @@ async function toggleVoice() {
   // 録音中に画面が消えないようにする
   requestWakeLock();
 
-  // マイク権限を事前に確認・取得
-  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+  // マイク権限を事前に確認・取得（初回のみ。一度許可したら次回からは確認しない）
+  if (!localStorage.getItem('micGranted') && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach(t => t.stop()); // 権限確認後すぐ解放
+      localStorage.setItem('micGranted', '1'); // 次回以降スキップ
     } catch (err) {
       showStatus('voiceStatus',
         'マイクへのアクセスが拒否されています。iPhoneの「設定」→「Safari」→「マイク」を許可してください',
