@@ -1,27 +1,19 @@
-const CACHE_NAME = 'nippou-v1';
-const ASSETS = ['/', '/index.html', '/manifest.json'];
+// このService Workerは「古いキャッシュを削除して自分自身も消える」ためのものです。
+// 過去にキャッシュした古い日報アプリを端末から一掃し、常に最新版を読み込ませます。
 
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
-  );
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
-});
-
-self.addEventListener('fetch', event => {
-  if (event.request.url.includes('googleapis.com') || event.request.url.includes('anthropic.com')) {
-    return;
-  }
-  event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request))
-  );
+  event.waitUntil((async () => {
+    // すべてのキャッシュを削除
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+    // このService Worker自身の登録を解除
+    await self.registration.unregister();
+    // 開いているページを再読み込みして最新版を表示
+    const clients = await self.clients.matchAll({ type: 'window' });
+    clients.forEach(client => client.navigate(client.url));
+  })());
 });
