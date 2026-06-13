@@ -228,16 +228,9 @@ let summaryResult = '';
 document.addEventListener('DOMContentLoaded', () => {
   updateDateDisplay();
   loadApiKey();
-  // ホーム画面から起動された場合はキーボードモードに切り替え
+  // 万一ホーム画面の全画面モードで起動された場合のみ案内を表示（音声ボタンは無効化しない）
   if (window.navigator.standalone === true) {
     document.getElementById('standaloneWarning').style.display = 'block';
-    // 音声ボタンを無効化してキーボード入力を促す
-    const voiceBtn = document.getElementById('voiceBtn');
-    voiceBtn.disabled = true;
-    voiceBtn.style.opacity = '0.4';
-    voiceBtn.textContent = '🎤 音声入力（Safariで開いた時のみ使用可）';
-    // テキストエリアにフォーカス
-    setTimeout(() => document.getElementById('reportText').focus(), 500);
   }
 });
 
@@ -509,11 +502,14 @@ function showStatus(id, message, type) {
 </script>
 
 <script>
+// 古いキャッシュ（Service Worker）を完全に削除して、常に最新版を読み込む
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('service-worker.js')
-      .catch(err => console.log('SW:', err));
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(reg => reg.unregister());
   });
+}
+if (window.caches) {
+  caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
 }
 </script>
 
