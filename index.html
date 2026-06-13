@@ -223,11 +223,32 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyZqC_aZKQ2HatFgUTz4Nym
 let recognition = null;
 let isRecording = false;
 let summaryResult = '';
+let wakeLock = null;
+
+// ============ 画面ロック防止（Wake Lock） ============
+// アプリを開いている間は画面が自動で消えないようにする
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch (err) {
+    // 取得できなくてもアプリ自体は動くので無視
+  }
+}
+
+// 一度ホーム画面などに切り替えると解除されるため、戻ってきたら再取得する
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    requestWakeLock();
+  }
+});
 
 // ============ 初期化 ============
 document.addEventListener('DOMContentLoaded', () => {
   updateDateDisplay();
   loadApiKey();
+  requestWakeLock();
   // 万一ホーム画面の全画面モードで起動された場合のみ案内を表示（音声ボタンは無効化しない）
   if (window.navigator.standalone === true) {
     document.getElementById('standaloneWarning').style.display = 'block';
@@ -286,6 +307,9 @@ async function toggleVoice() {
     stopVoice();
     return;
   }
+
+  // 録音中に画面が消えないようにする
+  requestWakeLock();
 
   // マイク権限を事前に確認・取得
   if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
