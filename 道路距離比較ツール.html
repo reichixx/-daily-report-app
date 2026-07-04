@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>道路距離比較ツール</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Meiryo', sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(135deg, #2d6a4f 0%, #40916c 100%);
+      color: white;
+      padding: 20px 20px 16px;
+      text-align: center;
+    }
+    header h1 { font-size: 20px; font-weight: 700; }
+    header p { font-size: 12px; opacity: 0.85; margin-top: 4px; }
+
+    .container { max-width: 720px; margin: 0 auto; padding: 16px; }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .card h2 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #2d6a4f;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #d8f3dc;
+    }
+
+    .input-group { margin-bottom: 14px; }
+    .input-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 5px;
+    }
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+    .input-row input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color 0.2s;
+      min-width: 0;
+    }
+    .input-row input:focus {
+      outline: none;
+      border-color: #40916c;
+    }
+    .badge-origin { background: #1a56db; color: white; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
+    .badge-a { background: #e53e3e; color: white; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
+    .badge-b { background: #d97706; color: white; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
+    .label-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+    .label-row span.lbl { font-size: 12px; font-weight: 600; color: #4a5568; }
+
+    .btn-calc {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #2d6a4f 0%, #40916c 100%);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity 0.2s;
+    }
+    .btn-calc:hover { opacity: 0.9; }
+    .btn-calc:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #status {
+      text-align: center;
+      font-size: 13px;
+      color: #718096;
+      padding: 8px 0;
+      min-height: 24px;
+    }
+    #status.error { color: #e53e3e; }
+
+    /* 結果テーブル */
+    .result-card { display: none; }
+    .result-card.show { display: block; }
+
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    .compare-table th, .compare-table td {
+      padding: 12px 14px;
+      border: 1px solid #e2e8f0;
+      text-align: center;
+    }
+    .compare-table thead th {
+      background: #f7fafc;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .compare-table .row-label {
+      text-align: left;
+      font-weight: 600;
+      color: #4a5568;
+      background: #f7fafc;
+    }
+    .compare-table .val-a { color: #e53e3e; font-weight: 700; font-size: 16px; }
+    .compare-table .val-b { color: #d97706; font-weight: 700; font-size: 16px; }
+    .compare-table .val-sub { font-size: 12px; color: #718096; font-weight: 400; }
+
+    .winner-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .winner-a { background: #fed7d7; color: #c53030; }
+    .winner-b { background: #fef3c7; color: #92400e; }
+    .winner-equal { background: #e9d8fd; color: #553c9a; }
+
+    .diff-box {
+      background: #f0fdf4;
+      border: 1px solid #c6f6d5;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #276749;
+      line-height: 1.7;
+    }
+
+    /* 地図 */
+    #map {
+      width: 100%;
+      height: 320px;
+      border-radius: 10px;
+      border: 1.5px solid #e2e8f0;
+    }
+
+    /* コピーボタン */
+    .btn-copy {
+      padding: 8px 16px;
+      background: #edf2f7;
+      border: 1px solid #cbd5e0;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #4a5568;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-copy:hover { background: #e2e8f0; }
+
+    .copy-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 10px;
+    }
+
+    /* ローディングスピナー */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---- 地図から地点を選ぶモーダル ---- */
+    #pickerOverlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 2000;
+      align-items: center; justify-content: center;
+      padding: 16px;
+    }
+    #pickerOverlay.show { display: flex; }
+    #pickerBox {
+      background: white;
+      border-radius: 12px;
+      width: 100%; max-width: 640px;
+      padding: 16px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    }
+    #pickerMap {
+      width: 100%; height: 380px;
+      border-radius: 8px;
+      border: 1.5px solid #e2e8f0;
+    }
+
+    /* ---- 印刷用レポート（Ctrl+P / PDF保存） ---- */
+    .print-only { display: none; }
+
+    @media print {
+      body { background: white; }
+      header, .no-print, #status { display: none !important; }
+      .print-only { display: block; }
+      .container { max-width: 100%; padding: 0; }
+      .card {
+        box-shadow: none;
+        border-radius: 0;
+        padding: 8px 0;
+        margin-bottom: 10px;
+        break-inside: avoid;
+      }
+      .card h2 { font-size: 13px; }
+      .compare-table th, .compare-table td { padding: 8px 10px; }
+      /* 画面と同じ高さにする（変えると未読込タイルが灰色で印刷されるため） */
+      #map { height: 320px; border-radius: 0; border: 1px solid #999; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>道路距離比較ツール</h1>
+  <p>起点から２つの処分地までの道路距離を比較します</p>
+</header>
+
+<div class="container">
+
+  <!-- 入力フォーム -->
+  <div class="card no-print">
+    <h2>住所 または 座標を入力</h2>
+
+    <!-- 座標取得ガイド -->
+    <div style="background:#fefce8;border:1.5px solid #fde68a;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#78350f;line-height:1.7;">
+      <b>📍 住所がない場所（山林・現場など）の場合</b><br>
+      入力欄の右にある「<b>📍</b>」ボタンを押すと地図が開きます。場所をクリックすると緯度・経度が自動で入力されます。
+    </div>
+
+    <div class="input-group">
+      <div class="label-row">
+        <span class="badge-origin">起点</span>
+        <span class="lbl">住所 または 緯度,経度</span>
+      </div>
+      <div class="input-row">
+        <input type="text" id="origin" placeholder="例: 大阪府大阪市北区梅田1-1-1　または　34.693, 135.502">
+        <button onclick="openPicker('origin')" title="地図から地点を選ぶ" style="padding:0 10px;border:1.5px solid #e2e8f0;border-radius:8px;background:#f7fafc;cursor:pointer;font-size:16px;flex-shrink:0;">📍</button>
+      </div>
+    </div>
+
+    <div class="input-group">
+      <div class="label-row">
+        <span class="badge-a">処分地A</span>
+        <span class="lbl">住所 または 緯度,経度</span>
+      </div>
+      <div class="input-row">
+        <input type="text" id="destA" placeholder="例: 大阪府堺市南区原山台1-1-1　または　34.512, 135.489">
+        <button onclick="openPicker('destA')" title="地図から地点を選ぶ" style="padding:0 10px;border:1.5px solid #e2e8f0;border-radius:8px;background:#f7fafc;cursor:pointer;font-size:16px;flex-shrink:0;">📍</button>
+      </div>
+      <div class="input-row" style="margin-top:6px;">
+        <input type="text" id="viaA" placeholder="経由地（任意）住所または座標。複数ある場合は ; で区切る" style="font-size:12px;padding:8px 12px;background:#fafafa;">
+      </div>
+    </div>
+
+    <div class="input-group" style="margin-bottom:18px">
+      <div class="label-row">
+        <span class="badge-b">処分地B</span>
+        <span class="lbl">住所 または 緯度,経度（任意・１箇所だけ測る場合は空欄）</span>
+      </div>
+      <div class="input-row">
+        <input type="text" id="destB" placeholder="例: 大阪府豊中市螢池西町1-1-1　または　34.782, 135.468">
+        <button onclick="openPicker('destB')" title="地図から地点を選ぶ" style="padding:0 10px;border:1.5px solid #e2e8f0;border-radius:8px;background:#f7fafc;cursor:pointer;font-size:16px;flex-shrink:0;">📍</button>
+      </div>
+      <div class="input-row" style="margin-top:6px;">
+        <input type="text" id="viaB" placeholder="経由地（任意）住所または座標。複数ある場合は ; で区切る" style="font-size:12px;padding:8px 12px;background:#fafafa;">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-bottom:18px;">
+      <div style="flex:1.5;">
+        <div class="label-row"><span class="lbl">工事名（印刷レポート用・任意）</span></div>
+        <div class="input-row"><input type="text" id="projName" placeholder="例: ○○線道路改良工事"></div>
+      </div>
+      <div style="flex:1;">
+        <div class="label-row"><span class="lbl">作成者（任意）</span></div>
+        <div class="input-row"><input type="text" id="authorName" placeholder="例: 山田"></div>
+      </div>
+    </div>
+
+    <button class="btn-calc" id="btnCalc" onclick="calculate()">距離を計算する</button>
+    <div id="status"></div>
+  </div>
+
+  <!-- 印刷用ヘッダー（画面では非表示） -->
+  <div class="print-only" id="printHeader" style="margin-bottom:12px;">
+    <h1 style="font-size:20px;text-align:center;margin:4px 0 14px;letter-spacing:0.3em;">運搬距離比較計算書</h1>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <tr>
+        <td style="border:1px solid #999;padding:7px 10px;background:#f0f0f0;width:14%;font-weight:600;">工事名</td>
+        <td style="border:1px solid #999;padding:7px 10px;width:50%;" id="printProj">&nbsp;</td>
+        <td style="border:1px solid #999;padding:7px 10px;background:#f0f0f0;width:12%;font-weight:600;">作成日</td>
+        <td style="border:1px solid #999;padding:7px 10px;width:24%;" id="printDate">&nbsp;</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #999;padding:7px 10px;background:#f0f0f0;font-weight:600;">作成者</td>
+        <td style="border:1px solid #999;padding:7px 10px;" id="printAuthor">&nbsp;</td>
+        <td style="border:1px solid #999;padding:7px 10px;background:#f0f0f0;font-weight:600;">検算者</td>
+        <td style="border:1px solid #999;padding:7px 10px;">&nbsp;</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 結果 -->
+  <div class="card result-card" id="resultCard">
+    <h2>比較結果</h2>
+
+    <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
+      <span class="badge-origin" style="white-space:nowrap">起点</span>
+      <span style="font-size:13px;font-weight:600;color:#1e3a5f" id="originDisplay">—</span>
+    </div>
+
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th style="width:32%"></th>
+          <th style="word-break:break-all;min-width:120px;"><span class="badge-a">処分地A</span><br><span id="nameA" style="font-size:11px;font-weight:400;color:#4a5568;line-height:1.5;display:inline-block;margin-top:3px;"></span></th>
+          <th class="colB" style="word-break:break-all;min-width:120px;"><span class="badge-b">処分地B</span><br><span id="nameB" style="font-size:11px;font-weight:400;color:#4a5568;line-height:1.5;display:inline-block;margin-top:3px;"></span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="row-label">道路距離</td>
+          <td><span class="val-a" id="distA">—</span><span style="font-size:13px;color:#718096"> km</span></td>
+          <td class="colB"><span class="val-b" id="distB">—</span><span style="font-size:13px;color:#718096"> km</span></td>
+        </tr>
+        <tr>
+          <td class="row-label">所要時間（目安）</td>
+          <td><span id="timeA" style="font-weight:600">—</span><br><span class="val-sub">（一般道想定）</span></td>
+          <td class="colB"><span id="timeB" style="font-weight:600">—</span><br><span class="val-sub">（一般道想定）</span></td>
+        </tr>
+        <tr>
+          <td class="row-label">往復距離</td>
+          <td><span id="roundA" style="font-weight:600">—</span></td>
+          <td class="colB"><span id="roundB" style="font-weight:600">—</span></td>
+        </tr>
+        <tr id="judgeRow">
+          <td class="row-label">判定</td>
+          <td id="judgeA">—</td>
+          <td class="colB" id="judgeB">—</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="font-size:11px;color:#718096;margin:-4px 0 10px;">※距離は 0.1 km 単位で切り上げています（積算対応）</p>
+
+    <div class="diff-box" id="diffBox"></div>
+
+    <div class="no-print" style="margin-top:12px;text-align:center;font-size:12px;color:#718096;">
+      別サービスでの照合（参考・外部サイトが開きます）:
+      <a id="gmapLinkA" href="#" target="_blank" style="color:#c53030;font-weight:600;">処分地Aへの経路</a><span id="gmapLinkBWrap">　/
+      <a id="gmapLinkB" href="#" target="_blank" style="color:#b45309;font-weight:600;">処分地Bへの経路</a></span>
+    </div>
+
+    <div class="copy-row no-print" style="gap:8px;">
+      <button class="btn-copy" onclick="printReport()" style="background:#2d6a4f;color:white;border-color:#2d6a4f;">🖨 印刷・PDF保存（検算用レポート）</button>
+      <button class="btn-copy" onclick="copyResult()">結果をテキストでコピー</button>
+    </div>
+  </div>
+
+  <!-- 地図 -->
+  <div class="card result-card" id="mapCard">
+    <h2>運搬ルート図</h2>
+    <div id="map"></div>
+    <p class="no-print" style="font-size:11px;color:#a0aec0;margin-top:8px;text-align:center">地図: 国土地理院（淡色地図）　距離計算: OpenStreetMap routing (OSRM)　住所検索: 国土地理院</p>
+
+    <!-- 印刷用：計算条件・出典（検算者向け） -->
+    <div class="print-only" style="font-size:11px;color:#333;line-height:1.9;border-top:1px solid #ccc;padding-top:8px;margin-top:10px;">
+      <b>【計算条件・出典】</b><br>
+      ・道路距離: OSRM（OpenStreetMap道路網）による自動車経路探索　・距離は 0.1 km 単位で切り上げ<br>
+      ・住所検索: 国土地理院 住所検索API　・地図表示: 国土地理院 淡色地図（出典: 国土地理院）<br>
+      <span id="printCoords"></span>
+      <span id="printVias"></span>
+      <span id="printCalcTime"></span>
+    </div>
+  </div>
+
+</div>
+
+<!-- 地図から地点を選ぶモーダル -->
+<div id="pickerOverlay">
+  <div id="pickerBox">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <b style="font-size:14px;color:#2d6a4f;">📍 地図をクリックして地点を選ぶ</b>
+      <button onclick="closePicker()" style="padding:6px 14px;border:1px solid #cbd5e0;border-radius:7px;background:#f7fafc;cursor:pointer;font-size:12px;font-family:inherit;">✕ 閉じる</button>
+    </div>
+    <p style="font-size:12px;color:#4a5568;margin-bottom:8px;">住所のない山林・現場でも指定できます。地図を拡大して、目的の場所をクリックしてください。</p>
+    <div id="pickerMap"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:10px;flex-wrap:wrap;">
+      <span id="pickerCoords" style="font-size:13px;font-weight:600;color:#4a5568;">未選択（地図をクリックしてください）</span>
+      <button class="btn-calc" id="pickerUseBtn" onclick="usePickedPoint()" disabled style="width:auto;padding:10px 24px;font-size:14px;">この地点を使う</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let map = null;
+let routeLayerA = null;
+let routeLayerB = null;
+let markers = [];
+
+// 結果データ保持
+let lastResult = null;
+
+// ---- 緯度経度の直接入力を判定 ----
+// 「34.693, 135.502」「34.693,135.502」などを判別する
+function parseCoords(input) {
+  const m = input.trim().match(/^(-?\d{1,3}\.?\d*)[\s,、]+(-?\d{1,3}\.?\d*)$/);
+  if (!m) return null;
+  const lat = parseFloat(m[1]);
+  const lng = parseFloat(m[2]);
+  // 日本周辺の範囲チェック（緯度20〜50、経度120〜155）
+  if (lat >= 20 && lat <= 50 && lng >= 120 && lng <= 155) {
+    return { lat, lng, title: `${lat}, ${lng}（座標入力）` };
+  }
+  return null;
+}
+
+// ---- 住所または座標を解決 ----
+async function resolveLocation(input) {
+  const coords = parseCoords(input);
+  if (coords) return coords;          // 座標ならそのまま使う
+  return geocode(input);              // 住所なら国土地理院でジオコーディング
+}
+
+// ---- 地図から地点を選ぶ（国土地理院地図・クリックで座標入力） ----
+let pickerMap = null, pickerMarker = null, pickerTarget = null, pickedLatLng = null;
+
+async function openPicker(fieldId) {
+  pickerTarget = fieldId;
+  pickedLatLng = null;
+  document.getElementById('pickerCoords').textContent = '未選択（地図をクリックしてください）';
+  document.getElementById('pickerUseBtn').disabled = true;
+  document.getElementById('pickerOverlay').classList.add('show');
+
+  if (!pickerMap) {
+    // 初期表示は京都市域
+    pickerMap = L.map('pickerMap').setView([35.011, 135.768], 12);
+    L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', {
+      attribution: '出典: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">国土地理院</a>',
+      maxZoom: 18
+    }).addTo(pickerMap);
+    pickerMap.on('click', e => {
+      pickedLatLng = e.latlng;
+      if (pickerMarker) pickerMap.removeLayer(pickerMarker);
+      pickerMarker = L.marker(e.latlng).addTo(pickerMap);
+      document.getElementById('pickerCoords').textContent =
+        `選択中: ${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
+      document.getElementById('pickerUseBtn').disabled = false;
+    });
+  }
+  setTimeout(() => pickerMap.invalidateSize(), 60);
+
+  // 入力済みの住所・座標があればその付近、なければ京都市域を表示
+  const val = document.getElementById(fieldId).value.trim();
+  if (val) {
+    try {
+      const p = await resolveLocation(val);
+      pickerMap.setView([p.lat, p.lng], 14);
+    } catch {
+      pickerMap.setView([35.011, 135.768], 12);
+    }
+  } else {
+    pickerMap.setView([35.011, 135.768], 12);
+  }
+}
+
+function closePicker() {
+  document.getElementById('pickerOverlay').classList.remove('show');
+}
+
+function usePickedPoint() {
+  if (!pickedLatLng || !pickerTarget) return;
+  document.getElementById(pickerTarget).value =
+    `${pickedLatLng.lat.toFixed(6)}, ${pickedLatLng.lng.toFixed(6)}`;
+  closePicker();
+}
+
+// ---- 国土地理院 ジオコーディング ----
+async function geocode(address) {
+  const url = `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(address)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('住所検索に失敗しました');
+  const data = await res.json();
+  if (!data || data.length === 0) throw new Error(`「${address}」が見つかりませんでした`);
+  const [lng, lat] = data[0].geometry.coordinates;
+  return { lat, lng, title: data[0].properties.title };
+}
+
+// ---- 経由地入力（; 区切り）を解決 ----
+async function resolveVias(input) {
+  if (!input) return [];
+  const parts = input.split(/[;；]/).map(s => s.trim()).filter(Boolean);
+  return Promise.all(parts.map(resolveLocation));
+}
+
+// ---- OSRM 道路距離計算（経由地対応） ----
+async function getRoute(from, to, vias = []) {
+  const pts = [from, ...vias, to].map(p => `${p.lng},${p.lat}`).join(';');
+  const url = `https://router.project-osrm.org/route/v1/driving/${pts}?overview=full&geometries=geojson`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('ルート計算に失敗しました');
+  const data = await res.json();
+  if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
+    throw new Error('ルートが見つかりませんでした');
+  }
+  const route = data.routes[0];
+  return {
+    distanceM: route.distance,
+    durationS: route.duration,
+    geometry: route.geometry
+  };
+}
+
+// 距離は 0.1km 単位で切り上げ（積算基準対応）
+function fmtDist(m) {
+  return (Math.ceil(m / 100) / 10).toFixed(1);
+}
+function fmtTime(s) {
+  const min = Math.round(s / 60);
+  if (min < 60) return `約${min}分`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `約${h}時間${m > 0 ? m + '分' : ''}`;
+}
+
+function setStatus(msg, isError = false) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = isError ? 'error' : '';
+}
+
+async function calculate() {
+  const originAddr = document.getElementById('origin').value.trim();
+  const destAAddr = document.getElementById('destA').value.trim();
+  const destBAddr = document.getElementById('destB').value.trim();
+
+  if (!originAddr || !destAAddr) {
+    setStatus('起点と処分地Aを入力してください（処分地Bは任意）', true);
+    return;
+  }
+  // 処分地Bは任意：空欄なら処分地Aへの距離だけを測定する
+  const hasB = !!destBAddr;
+
+  const btn = document.getElementById('btnCalc');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>計算中...';
+  setStatus('住所を検索中...');
+  document.getElementById('resultCard').classList.remove('show');
+  document.getElementById('mapCard').classList.remove('show');
+
+  const viaAStr = document.getElementById('viaA').value.trim();
+  const viaBStr = document.getElementById('viaB').value.trim();
+
+  try {
+    // ジオコーディング
+    setStatus('住所・座標を確認中... (1/3)');
+    const [origin, destA, destB, viasA, viasB] = await Promise.all([
+      resolveLocation(originAddr),
+      resolveLocation(destAAddr),
+      hasB ? resolveLocation(destBAddr) : Promise.resolve(null),
+      resolveVias(viaAStr),
+      resolveVias(viaBStr)
+    ]);
+
+    setStatus('道路距離を計算中... (2/3)');
+    const [routeA, routeB] = await Promise.all([
+      getRoute(origin, destA, viasA),
+      hasB ? getRoute(origin, destB, viasB) : Promise.resolve(null)
+    ]);
+
+    setStatus('地図を描画中... (3/3)');
+
+    // 起点住所を表示
+    document.getElementById('originDisplay').textContent = originAddr;
+
+    // Google マップリンクをセット（緯度経度で指定・経由地対応）
+    const gmapBase = 'https://www.google.com/maps/dir/?api=1&travelmode=driving';
+    const originParam = `${origin.lat},${origin.lng}`;
+    const wpParam = (vias) => vias.length ? `&waypoints=${vias.map(p => `${p.lat},${p.lng}`).join('|')}` : '';
+    document.getElementById('gmapLinkA').href =
+      `${gmapBase}&origin=${originParam}&destination=${destA.lat},${destA.lng}${wpParam(viasA)}`;
+    document.getElementById('gmapLinkBWrap').style.display = hasB ? '' : 'none';
+    if (hasB) {
+      document.getElementById('gmapLinkB').href =
+        `${gmapBase}&origin=${originParam}&destination=${destB.lat},${destB.lng}${wpParam(viasB)}`;
+    }
+
+    // 印刷用：座標・経由地・計算日時を記録（検算者が同条件で再現できるように）
+    const fmtC = p => `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+    document.getElementById('printCoords').innerHTML =
+      `・座標　起点: ${fmtC(origin)}　／　処分地A: ${fmtC(destA)}` +
+      (hasB ? `　／　処分地B: ${fmtC(destB)}` : '') + '<br>';
+    document.getElementById('printVias').innerHTML =
+      (viaAStr ? `・経由地A: ${viaAStr}<br>` : '') + (hasB && viaBStr ? `・経由地B: ${viaBStr}<br>` : '');
+    document.getElementById('printCalcTime').innerHTML =
+      `・計算日時: ${new Date().toLocaleString('ja-JP')}`;
+
+    // 結果表示
+    const distA = fmtDist(routeA.distanceM);
+    const timeA = fmtTime(routeA.durationS);
+    const roundA = (parseFloat(distA) * 2).toFixed(1);
+
+    document.getElementById('distA').textContent = distA;
+    document.getElementById('timeA').textContent = timeA;
+    document.getElementById('roundA').textContent = `${roundA} km`;
+    document.getElementById('nameA').textContent = destAAddr;
+
+    // 処分地Bの列と判定行は、Bが入力されているときだけ表示
+    document.querySelectorAll('.colB').forEach(el => { el.style.display = hasB ? '' : 'none'; });
+    document.getElementById('judgeRow').style.display = hasB ? '' : 'none';
+    document.getElementById('diffBox').style.display = hasB ? '' : 'none';
+
+    let distB = null, timeB = null, roundB = null, dB = null;
+    const dA = routeA.distanceM;
+
+    if (hasB) {
+      distB = fmtDist(routeB.distanceM);
+      timeB = fmtTime(routeB.durationS);
+      roundB = (parseFloat(distB) * 2).toFixed(1);
+      dB = routeB.distanceM;
+
+      document.getElementById('distB').textContent = distB;
+      document.getElementById('timeB').textContent = timeB;
+      document.getElementById('roundB').textContent = `${roundB} km`;
+      document.getElementById('nameB').textContent = destBAddr;
+
+      // 判定
+      const diff = Math.abs(dA - dB);
+      const diffKm = fmtDist(diff);
+
+      if (diff < 200) {
+        // ほぼ同距離
+        document.getElementById('judgeA').innerHTML = '<span class="winner-badge winner-equal">ほぼ同距離</span>';
+        document.getElementById('judgeB').innerHTML = '<span class="winner-badge winner-equal">ほぼ同距離</span>';
+        document.getElementById('diffBox').textContent = `処分地Aと処分地Bの距離差はわずか ${diffKm} km で、ほぼ同距離です。`;
+      } else if (dA < dB) {
+        document.getElementById('judgeA').innerHTML = '<span class="winner-badge winner-a">✔ より近い</span>';
+        document.getElementById('judgeB').innerHTML = '—';
+        document.getElementById('diffBox').innerHTML =
+          `<strong>処分地A のほうが ${diffKm} km 近い</strong>です。<br>
+           処分地A: ${distA} km（往復 ${roundA} km） ／ 処分地B: ${distB} km（往復 ${roundB} km）<br>
+           往復差: ${Math.abs(parseFloat(roundA) - parseFloat(roundB)).toFixed(1)} km`;
+      } else {
+        document.getElementById('judgeA').innerHTML = '—';
+        document.getElementById('judgeB').innerHTML = '<span class="winner-badge winner-b">✔ より近い</span>';
+        document.getElementById('diffBox').innerHTML =
+          `<strong>処分地B のほうが ${diffKm} km 近い</strong>です。<br>
+           処分地A: ${distA} km（往復 ${roundA} km） ／ 処分地B: ${distB} km（往復 ${roundB} km）<br>
+           往復差: ${Math.abs((parseFloat(roundA) - parseFloat(roundB))).toFixed(1)} km`;
+      }
+    }
+
+    lastResult = { originAddr, destAAddr, destBAddr, viaAStr, viaBStr, hasB, distA, distB, timeA, timeB, roundA, roundB, dA, dB };
+
+    // 地図カードを表示してから描画する（非表示のまま描画するとサイズが0になり灰色になる）
+    document.getElementById('resultCard').classList.add('show');
+    document.getElementById('mapCard').classList.add('show');
+    drawMap(origin, destA, destB, routeA, routeB, [...viasA, ...viasB]);
+    setStatus('');
+
+  } catch (e) {
+    setStatus(`エラー: ${e.message}`, true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '距離を計算する';
+  }
+}
+
+// 国土地理院地図（淡色）で描画 — 公共事業の資料に出典明記で利用可能
+function drawMap(origin, destA, destB, routeA, routeB, vias = []) {
+  if (!map) {
+    map = L.map('map');
+    L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', {
+      attribution: '出典: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">国土地理院</a>',
+      maxZoom: 18
+    }).addTo(map);
+  } else {
+    if (routeLayerA) map.removeLayer(routeLayerA);
+    if (routeLayerB) map.removeLayer(routeLayerB);
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+  }
+
+  // 表示直後はコンテナサイズが未反映のことがあるため再計算させる
+  map.invalidateSize();
+
+  // ルート描画（A=赤実線、B=オレンジ破線。Bは未入力なら描画しない）
+  routeLayerA = L.geoJSON(routeA.geometry, {
+    style: { color: '#e53e3e', weight: 5, opacity: 0.85 }
+  }).addTo(map);
+  routeLayerB = routeB ? L.geoJSON(routeB.geometry, {
+    style: { color: '#d97706', weight: 5, opacity: 0.85, dashArray: '10,7' }
+  }).addTo(map) : null;
+
+  // マーカー（丸バッジ）
+  const makeIcon = (color, text, size = 28, fs = 11) => L.divIcon({
+    className: '',
+    html: `<div style="background:${color};color:white;border-radius:50%;width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;font-size:${fs}px;font-weight:700;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4)">${text}</div>`,
+    iconSize: [size, size], iconAnchor: [size/2, size/2]
+  });
+
+  const mO = L.marker([origin.lat, origin.lng], { icon: makeIcon('#1a56db', '起', 28, 10), zIndexOffset: 100 })
+    .bindPopup(`<b>起点</b><br>${origin.title}`).addTo(map);
+  const mA = L.marker([destA.lat, destA.lng], { icon: makeIcon('#e53e3e', 'A') })
+    .bindPopup(`<b>処分地A</b><br>${destA.title}`).addTo(map);
+  markers = [mO, mA];
+  if (destB) {
+    const mB = L.marker([destB.lat, destB.lng], { icon: makeIcon('#d97706', 'B') })
+      .bindPopup(`<b>処分地B</b><br>${destB.title}`).addTo(map);
+    markers.push(mB);
+  }
+
+  // 経由地マーカー（グレーの小丸）
+  vias.forEach(v => {
+    const mV = L.marker([v.lat, v.lng], { icon: makeIcon('#64748b', '経', 20, 9) })
+      .bindPopup(`<b>経由地</b><br>${v.title}`).addTo(map);
+    markers.push(mV);
+  });
+
+  // 全地点が収まるよう自動ズーム
+  const pts = [
+    [origin.lat, origin.lng],
+    [destA.lat, destA.lng],
+    ...vias.map(v => [v.lat, v.lng])
+  ];
+  if (destB) pts.push([destB.lat, destB.lng]);
+  map.fitBounds(L.latLngBounds(pts), { padding: [35, 35] });
+}
+
+// ---- 印刷・PDF保存（検算用レポート） ----
+function printReport() {
+  if (!lastResult) return;
+  const proj = document.getElementById('projName').value.trim();
+  const author = document.getElementById('authorName').value.trim();
+  document.getElementById('printProj').textContent = proj || '　';
+  document.getElementById('printAuthor').textContent = author || '　';
+  document.getElementById('printDate').textContent =
+    new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
+  window.print();
+}
+
+function copyResult() {
+  if (!lastResult) return;
+  const { originAddr, destAAddr, destBAddr, viaAStr, viaBStr, hasB, distA, distB, timeA, timeB, roundA, roundB, dA, dB } = lastResult;
+
+  let text =
+`【運搬距離${hasB ? '比較' : '測定'}】
+起点: ${originAddr}
+
+処分地A: ${destAAddr}${viaAStr ? `（経由: ${viaAStr}）` : ''}
+　距離: ${distA} km　所要時間: ${timeA}　往復: ${roundA} km`;
+
+  if (hasB) {
+    const winner = dA < dB ? `処分地A が ${(Math.abs(dB - dA)/1000).toFixed(1)} km 近い` :
+                   dB < dA ? `処分地B が ${(Math.abs(dA - dB)/1000).toFixed(1)} km 近い` : 'ほぼ同距離';
+    text += `
+
+処分地B: ${destBAddr}${viaBStr ? `（経由: ${viaBStr}）` : ''}
+　距離: ${distB} km　所要時間: ${timeB}　往復: ${roundB} km
+
+判定: ${winner}`;
+  }
+
+  text += `
+※距離は0.1km単位切り上げ／OSRM（OpenStreetMap道路網）による道路距離`;
+
+  const btn = document.querySelector('.btn-copy');
+
+  const onSuccess = () => {
+    btn.textContent = 'コピーしました！';
+    setTimeout(() => { btn.textContent = '結果をテキストでコピー'; }, 2000);
+  };
+
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try {
+      document.execCommand('copy');
+      onSuccess();
+    } catch {
+      alert('コピーに失敗しました。\n\n以下をコピーしてください:\n\n' + text);
+    }
+    document.body.removeChild(ta);
+  };
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(onSuccess).catch(fallback);
+  } else {
+    fallback();
+  }
+}
+
+// Enterキーで計算（地点選択モーダルが開いている間は無効）
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !document.getElementById('pickerOverlay').classList.contains('show')) {
+    calculate();
+  }
+});
+</script>
+</body>
+</html>
